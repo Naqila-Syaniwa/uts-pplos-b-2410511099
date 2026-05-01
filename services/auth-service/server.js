@@ -3,9 +3,64 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("./db");
+const passport = require("passport");
+const GithubStrategy = require("passport-github2").Strategy;
+const session = require("express-session");
 
 const app = express();
+
 app.use(express.json());
+
+// Session dan passport
+app.use(session({
+    secret: "secret",
+    resave: false,
+    saveUninitialized: true,
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Github strategy
+passport.use(
+    new GithubStrategy(
+        {
+            clientID: process.env.GITHUB_CLIENT_ID,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
+            callbackURL: process.env.GITHUB_CALLBACK,
+        },
+        (accessToken, refreshToken, profile, done) => {
+            const email = profile.emails?.[0]?.value;
+
+            db.query(
+                "SELECT * FROM users WHERE oauth_id = ? OR email = ?",
+                [profile.id, email],
+                (err, result) => {
+                    if (result.length > 0) {
+                        return done(null, result[0]);
+                    }
+
+                    db.query(
+                        "INSERT INTO users (name, email, avatar, oauth_provider, oauth_id) VALUES (?, ?, ?, ?, ?)",
+                        [
+                            profile.displayName,
+                            email,
+                            profile.photos[0].value,
+                            "github",
+                            profile.id,
+                        ],
+                        (err, res) => {
+                            return done(null, {
+                                id: res.insertId,
+                                email,
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    )
+);
 
 // JWT Middleware
 const authMiddleware = (req, res, next) => {
@@ -56,6 +111,10 @@ app.post("/auth/register", async (req, res) => {
 // Login user
 app.post("/auth/login", (req, res) => {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(422).json({ message: "Email dan password wajib diisi" });
+    }
 
     db.query("SELECT * FROM users WHERE email = ?", [email], async (err, result) => {
         if (err || result.length === 0) {
@@ -158,6 +217,37 @@ app.post("/auth/logout", (req, res) => {
         }
     );
 });
+
+// Github OAuth login
+app.get(
+    "/auth/github",
+    passport.authenticate("github", { scope: ["user:email"] })
+);
+
+// Github callback
+app.get(
+    "/auth/github/callback",
+    passport.authenticate("github", { session: false }),
+    (req, res) => {
+        const payload = {
+            id: req.user.id,
+            email: req.user.email,
+        };
+
+        const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: "15m",
+        });
+
+        const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+            expiresIn: "7d",
+        });
+
+        res.json({
+            accessToken,
+            refreshToken,
+        });
+    }
+);
 
 // Protected route
 app.get("/protected", authMiddleware, (req, res) => {
