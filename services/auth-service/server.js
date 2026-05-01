@@ -51,7 +51,7 @@ app.post("/auth/login", (req, res) => {
         };
 
         // Access token (15 menit)
-        const acccesToken = jwt.sign(payload, process.env.JWT_SECRET, {
+        const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
             expiresIn: "15m",
         });
 
@@ -70,6 +70,69 @@ app.post("/auth/login", (req, res) => {
             refreshToken,
         });
     });
+});
+
+// Refresh token
+app.post("/auth/refresh", (req, res) => {
+    const { token } = req.body || {};
+
+    if (!token) {
+        return res.status(401).json({ message: "Refresh token required"});
+    }
+
+    db.query(
+        "SELECT * FROM refresh_tokens WHERE token = ?",
+        [token],
+        (err, result) => {
+            if (err || result.length === 0) {
+                return res.status(403).json({ message: "Invalid refresh token" });
+            }
+
+            const savedToken = result[0];
+
+            if (new Date(savedToken.expiry_date) < new Date()) {
+                return res.status(403).json({ message: "Refrsh token expired" });
+            }
+
+            jwt.verify(token, process.env.JWT_REFRESH_SECRET, (err, user) => {
+                if (err) {
+                    return res.status(403).json({ message: "Invalid token" });
+                }
+
+                const payload = {
+                    id: user.id,
+                    email: user.email,
+                };
+
+                const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+                    expiresIn: "15m",
+                });
+
+                res.json({ accessToken });
+            });
+        }
+    );
+});
+
+// Logout
+app.post("/auth/logout", (req, res) => {
+    const { token } = req.body || {};
+
+    if (!token) {
+        return res.status(400).json({ message: "Token required" });
+    }
+
+    db.query(
+        "DELETE FROM refresh_tokens WHERE token = ?",
+        [token],
+        (err) => {
+            if (err) {
+                return res.status(500).json({ message: "Failed to logout" });
+            }
+
+            res.json({ message: "Logged out successfully" });
+        }
+    );
 });
 
 // Jalankan server
