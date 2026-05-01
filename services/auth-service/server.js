@@ -7,6 +7,30 @@ const db = require("./db");
 const app = express();
 app.use(express.json());
 
+// JWT Middleware
+const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+
+    if (!authHeader) {
+        return res.status(401).json({ message: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+        return res.status(401).json({ message: "Invalid token format" });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: "Invalid or expired token" });
+        }
+
+        req.user = user;
+        next();
+    });
+};
+
 // Register user
 app.post("/auth/register", async (req, res) => {
     const { name, email, password } = req.body;
@@ -66,7 +90,7 @@ app.post("/auth/login", (req, res) => {
         );
 
         res.json({
-            acccesToken,
+            accessToken,
             refreshToken,
         });
     });
@@ -133,6 +157,14 @@ app.post("/auth/logout", (req, res) => {
             res.json({ message: "Logged out successfully" });
         }
     );
+});
+
+// Protected route
+app.get("/protected", authMiddleware, (req, res) => {
+    res.json({
+        message: "Access granted",
+        user: req.user,
+    });
 });
 
 // Jalankan server
