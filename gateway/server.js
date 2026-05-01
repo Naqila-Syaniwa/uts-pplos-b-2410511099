@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require ("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const rateLimit = require("express-rate-limit");
@@ -26,11 +27,15 @@ const verifyToken = (req, res, next) => {
         return res.status(401).json({ message: "Token required" });
     }
 
+    if (!authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Invalid token format" });
+    }
+
     const token = authHeader.split(" ")[1];
 
-    jwt.verify(token, "SECRET_KEY", (err, decoded) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
-            return res.status(403).json({ message: "Token required" });
+            return res.status(403).json({ message: "Invalid or expired token" });
         }
 
         req.user = decoded;
