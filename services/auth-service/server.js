@@ -7,7 +7,7 @@ const db = require("./db");
 const app = express();
 app.use(express.json());
 
-// Register
+// Register user
 app.post("/auth/register", async (req, res) => {
     const { name, email, password } = req.body;
 
@@ -29,7 +29,7 @@ app.post("/auth/register", async (req, res) => {
     );
 });
 
-// Login
+// Login user
 app.post("/auth/login", (req, res) => {
     const { email, password } = req.body;
 
