@@ -8,4 +8,4 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 $routes->get('fields', 'FieldController::index');
 $routes->get('fields/(:num)', 'FieldController::show/$1');
-$routes->get('schedules', 'FieldController::schedule');
+$routes->get('schedules', 'Schedules::index');
