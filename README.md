@@ -1,6 +1,6 @@
 # ReserveIt — Microservices Booking System
 
-## Identitas
+## Identitas Mahasiswa
 
 * Nama: Naqila Syaniwa
 * NIM: 2410511099
